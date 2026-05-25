@@ -6,6 +6,7 @@ import { calculateTotals } from './utils/calculations';
 import { downloadElementAsPDF } from './utils/pdf';
 import { buildDocumentFilename, formatDate, formatMoney, getFutureInputValue, getTodayInputValue } from './utils/format';
 import './styles.css';
+import './polish.css';
 
 const STORAGE_KEY = 'invoicekit-current-draft';
 const HISTORY_KEY = 'invoicekit-saved-documents';
