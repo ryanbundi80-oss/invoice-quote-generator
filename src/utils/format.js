@@ -29,3 +29,17 @@ export function getFutureInputValue(daysFromNow) {
   date.setDate(date.getDate() + daysFromNow);
   return date.toISOString().split('T')[0];
 }
+
+export function slugify(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'document';
+}
+
+export function buildDocumentFilename(invoice) {
+  const number = slugify(invoice.number || invoice.type || 'document');
+  const client = slugify(invoice.to?.name || 'client');
+  return `${number}-${client}.pdf`;
+}
