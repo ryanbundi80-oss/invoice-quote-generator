@@ -110,6 +110,7 @@ export default function InvoiceForm({ invoice, totals, readiness = [], savedDocu
         <div className="section-title">Branding</div>
         <div className="branding-tools">
           <label className="logo-uploader"><input type="file" accept="image/*" onChange={(event) => readLogo(event.target.files?.[0], onChange)} />{invoice.branding.logo ? <img src={invoice.branding.logo} alt="Uploaded logo preview" /> : <span>Upload logo</span>}</label>
+          <p className="helper-text">For the clearest PDF, use a sharp PNG/JPG logo. A logo around 500px wide or larger works best, while keeping the file below 750KB.</p>
           <div className="theme-options" aria-label="Theme colour options">{THEMES.map((theme) => <button aria-label={`Use ${theme} theme`} className={invoice.branding.accentColor === theme ? 'selected' : ''} key={theme} onClick={() => onChange('branding.accentColor', theme)} style={{ backgroundColor: theme }} type="button" />)}</div>
           <label className="field full">Document subtitle
             <select value={invoice.branding.documentSubtitle} onChange={(event) => onChange('branding.documentSubtitle', event.target.value)}>
