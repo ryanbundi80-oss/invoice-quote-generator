@@ -1,21 +1,124 @@
-import { Save } from 'lucide-react';
+import { CheckCircle2, Circle, Save } from 'lucide-react';
 import { CURRENCIES } from '../data/currencies';
 import LineItems from './LineItems';
-import { formatMoney } from '../utils/format';
+import { formatDate, formatMoney } from '../utils/format';
 
-export default function InvoiceForm({ invoice, totals, onChange, onChangeItem, onAddItem, onRemoveItem, onSaveDraft }) {
+const THEMES = ['#0f6b4a', '#1e3a8a', '#334155', '#a16207', '#be123c', '#6d28d9'];
+
+function readLogo(file, onChange) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    alert('Please upload an image file.');
+    return;
+  }
+  if (file.size > 750000) {
+    alert('Please use a logo below 750KB so the PDF stays light.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => onChange('branding.logo', reader.result);
+  reader.readAsDataURL(file);
+}
+
+function SavedDocuments({ documents = [], currentId, onLoad, onDuplicate, onDelete, onMarkPaid }) {
+  if (!documents.length) {
+    return <p className="empty-state">Saved invoices and quotes will appear here after you save or download.</p>;
+  }
+
+  return (
+    <div className="saved-list">
+      {documents.map((document) => {
+        const subtotal = document.items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
+        return (
+          <article className={`saved-item ${document.id === currentId ? 'active' : ''}`} key={document.id}>
+            <button className="saved-main" type="button" onClick={() => onLoad(document.id)}>
+              <strong>{document.number || 'Untitled document'}</strong>
+              <span>{document.to.name || 'No client'} · {formatMoney(subtotal, document.currency)}</span>
+              <small>{document.type} · {document.status} · {formatDate(document.updatedAt)}</small>
+            </button>
+            <div className="saved-actions">
+              <button type="button" onClick={() => onDuplicate(document.id)}>Duplicate</button>
+              <button type="button" onClick={() => onMarkPaid(document.id)}>Paid</button>
+              <button type="button" onClick={() => onDelete(document.id)}>Delete</button>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function InvoiceForm({
+  invoice,
+  totals,
+  readiness = [],
+  savedDocuments = [],
+  onChange,
+  onChangeItem,
+  onAddItem,
+  onRemoveItem,
+  onSaveDraft,
+  onNewDocument,
+  onLoadDocument,
+  onDuplicateDocument,
+  onDeleteDocument,
+  onMarkDocumentPaid
+}) {
   return (
     <section className="form-panel" aria-label="Invoice form">
       <div className="section-card highlight-card">
         <div>
-          <p className="eyebrow">MVP focus</p>
-          <h1>Create invoices without sign-up</h1>
-          <p className="muted">Start with a fast frontend tool. Accounts, M-Pesa automation, and dashboards come after people prove they want it.</p>
+          <p className="eyebrow">Stage 1 focus</p>
+          <h1>Create a professional document fast</h1>
+          <p className="muted">No sign-up yet. The goal is to help a freelancer create, save, download, and send a client-ready invoice or quote with minimum friction.</p>
         </div>
-        <button className="btn btn-secondary" type="button" onClick={onSaveDraft}>
-          <Save size={16} />
-          Save draft
-        </button>
+        <div className="quick-actions">
+          <button className="btn btn-primary" type="button" onClick={onSaveDraft}>
+            <Save size={16} />
+            Save
+          </button>
+          <button className="btn btn-secondary" type="button" onClick={() => onNewDocument(invoice.type)}>
+            New {invoice.type}
+          </button>
+        </div>
+      </div>
+
+      <div className="section-card readiness-card">
+        <div className="section-title">Readiness checklist</div>
+        <div className="readiness-grid">
+          {readiness.map((item) => (
+            <div className={item.done ? 'ready' : ''} key={item.label}>
+              {item.done ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="section-card">
+        <div className="section-title">Branding</div>
+        <div className="branding-tools">
+          <label className="logo-uploader">
+            <input type="file" accept="image/*" onChange={(event) => readLogo(event.target.files?.[0], onChange)} />
+            {invoice.branding.logo ? <img src={invoice.branding.logo} alt="Uploaded logo preview" /> : <span>Upload logo</span>}
+          </label>
+          <div className="theme-options" aria-label="Theme colour options">
+            {THEMES.map((theme) => (
+              <button
+                aria-label={`Use ${theme} theme`}
+                className={invoice.branding.accentColor === theme ? 'selected' : ''}
+                key={theme}
+                onClick={() => onChange('branding.accentColor', theme)}
+                style={{ backgroundColor: theme }}
+                type="button"
+              />
+            ))}
+          </div>
+          <label className="field full">
+            Document subtitle
+            <input value={invoice.branding.documentSubtitle} onChange={(event) => onChange('branding.documentSubtitle', event.target.value)} placeholder="Professional business document" />
+          </label>
+        </div>
       </div>
 
       <div className="section-card">
@@ -54,7 +157,7 @@ export default function InvoiceForm({ invoice, totals, onChange, onChangeItem, o
             <input type="date" value={invoice.issueDate} onChange={(event) => onChange('issueDate', event.target.value)} />
           </label>
           <label className="field">
-            Due date
+            {invoice.type === 'quote' ? 'Valid until' : 'Due date'}
             <input type="date" value={invoice.dueDate} onChange={(event) => onChange('dueDate', event.target.value)} />
           </label>
         </div>
@@ -96,6 +199,14 @@ export default function InvoiceForm({ invoice, totals, onChange, onChangeItem, o
           <label className="field">
             Client email
             <input value={invoice.to.email} onChange={(event) => onChange('to.email', event.target.value)} placeholder="client@example.com" />
+          </label>
+          <label className="field">
+            Client phone
+            <input value={invoice.to.phone} onChange={(event) => onChange('to.phone', event.target.value)} placeholder="+254 700 000 000" />
+          </label>
+          <label className="field">
+            Client KRA PIN / Tax ID
+            <input value={invoice.to.taxPin} onChange={(event) => onChange('to.taxPin', event.target.value)} placeholder="P000000000A" />
           </label>
           <label className="field full">
             Client address
@@ -145,6 +256,18 @@ export default function InvoiceForm({ invoice, totals, onChange, onChangeItem, o
           Notes / terms
           <textarea value={invoice.notes} onChange={(event) => onChange('notes', event.target.value)} placeholder="Payment due within 14 days. Thank you for your business." />
         </label>
+      </div>
+
+      <div className="section-card">
+        <div className="section-title">Saved documents</div>
+        <SavedDocuments
+          documents={savedDocuments}
+          currentId={invoice.id}
+          onLoad={onLoadDocument}
+          onDuplicate={onDuplicateDocument}
+          onDelete={onDeleteDocument}
+          onMarkPaid={onMarkDocumentPaid}
+        />
       </div>
     </section>
   );
