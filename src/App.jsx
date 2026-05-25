@@ -17,6 +17,59 @@ const TYPE_META = {
   receipt: { prefix: 'RCT', label: 'receipt', status: 'paid', subtitle: 'Payment Receipt' }
 };
 
+const TEXT_LIMITS = {
+  type: 20,
+  status: 20,
+  number: 40,
+  currency: 10,
+  issueDate: 20,
+  dueDate: 20,
+  'branding.logo': 1000000,
+  'branding.accentColor': 20,
+  'branding.documentSubtitle': 80,
+  'from.name': 100,
+  'from.email': 120,
+  'from.phone': 30,
+  'from.taxPin': 20,
+  'from.address': 300,
+  'to.name': 100,
+  'to.email': 120,
+  'to.phone': 30,
+  'to.taxPin': 20,
+  'to.address': 300,
+  paymentDetails: 600,
+  notes: 1000
+};
+
+const NUMBER_FIELDS = new Set(['taxRate', 'withholdingRate', 'amountPaid']);
+
+function stripControlCharacters(value) {
+  return String(value ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+}
+
+function limitText(value, maxLength = 500) {
+  return stripControlCharacters(value).slice(0, maxLength);
+}
+
+function normaliseNumberInput(value, max = 999999999) {
+  if (value === '') return '';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(Math.max(numeric, 0), max);
+}
+
+function sanitizeFieldValue(path, value) {
+  if (NUMBER_FIELDS.has(path)) return normaliseNumberInput(value);
+  return limitText(value, TEXT_LIMITS[path] ?? 500);
+}
+
+function sanitizeItemValue(field, value) {
+  if (field === 'description') return limitText(value, 240);
+  if (field === 'quantity') return normaliseNumberInput(value, 100000);
+  if (field === 'unitPrice') return normaliseNumberInput(value, 999999999);
+  return value;
+}
+
 function newLineItem() {
   return { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 };
 }
@@ -55,14 +108,28 @@ function createEmptyInvoice(overrides = {}) {
 function migrateInvoice(rawInvoice) {
   const fresh = createEmptyInvoice({ type: rawInvoice?.type || 'invoice' });
   const items = Array.isArray(rawInvoice?.items) && rawInvoice.items.length > 0
-    ? rawInvoice.items.map((item) => ({ ...newLineItem(), ...item, id: item.id || crypto.randomUUID() }))
+    ? rawInvoice.items.map((item) => ({
+      ...newLineItem(),
+      ...item,
+      id: item.id || crypto.randomUUID(),
+      description: sanitizeItemValue('description', item.description || ''),
+      quantity: sanitizeItemValue('quantity', item.quantity ?? 1),
+      unitPrice: sanitizeItemValue('unitPrice', item.unitPrice ?? 0)
+    }))
     : fresh.items;
 
   return {
     ...fresh,
     ...rawInvoice,
-    amountPaid: rawInvoice?.amountPaid ?? fresh.amountPaid,
-    branding: { ...fresh.branding, ...(rawInvoice?.branding || {}) },
+    number: sanitizeFieldValue('number', rawInvoice?.number ?? fresh.number),
+    taxRate: sanitizeFieldValue('taxRate', rawInvoice?.taxRate ?? fresh.taxRate),
+    withholdingRate: sanitizeFieldValue('withholdingRate', rawInvoice?.withholdingRate ?? fresh.withholdingRate),
+    amountPaid: sanitizeFieldValue('amountPaid', rawInvoice?.amountPaid ?? fresh.amountPaid),
+    branding: {
+      ...fresh.branding,
+      ...(rawInvoice?.branding || {}),
+      documentSubtitle: sanitizeFieldValue('branding.documentSubtitle', rawInvoice?.branding?.documentSubtitle ?? fresh.branding.documentSubtitle)
+    },
     from: { ...fresh.from, ...(rawInvoice?.from || {}) },
     to: { ...fresh.to, ...(rawInvoice?.to || {}) },
     items
@@ -121,14 +188,15 @@ function nextDocumentNumber(type, documents) {
 }
 
 function updateDocumentType(document, nextType, documents) {
-  const meta = TYPE_META[nextType] || TYPE_META.invoice;
+  const sanitizedType = sanitizeFieldValue('type', nextType);
+  const meta = TYPE_META[sanitizedType] || TYPE_META.invoice;
   return touch({
     ...document,
-    type: nextType,
-    status: nextType === 'receipt' ? 'paid' : document.status,
-    number: nextDocumentNumber(nextType, documents),
+    type: sanitizedType,
+    status: sanitizedType === 'receipt' ? 'paid' : document.status,
+    number: nextDocumentNumber(sanitizedType, documents),
     branding: { ...document.branding, documentSubtitle: meta.subtitle },
-    amountPaid: nextType === 'receipt' ? 0 : document.amountPaid
+    amountPaid: sanitizedType === 'receipt' ? 0 : document.amountPaid
   });
 }
 
@@ -201,13 +269,13 @@ export default function App() {
       setInvoice((current) => updateDocumentType(current, value, savedDocuments));
       return;
     }
-    setInvoice((current) => setNestedValue(current, path, value));
+    setInvoice((current) => setNestedValue(current, path, sanitizeFieldValue(path, value)));
   }
 
   function updateItem(index, field, value) {
     setInvoice((current) => {
       const items = [...current.items];
-      items[index] = { ...items[index], [field]: value };
+      items[index] = { ...items[index], [field]: sanitizeItemValue(field, value) };
       return touch({ ...current, items });
     });
   }
