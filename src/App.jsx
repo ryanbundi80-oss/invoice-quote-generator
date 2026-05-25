@@ -144,6 +144,16 @@ function buildShareMessage(invoice, totals) {
   return `Hi ${clientName}, please find your ${meta.label.toUpperCase()} ${invoice.number || ''} ${amountLine}${payment}\n\nThank you,\n${invoice.from.name || 'Your business'}`;
 }
 
+function hasPricedItemWithoutDescription(items) {
+  return items.some((item) => {
+    const quantity = Number(item.quantity) || 0;
+    const unitPrice = Number(item.unitPrice) || 0;
+    const hasAmount = quantity * unitPrice > 0;
+    const hasDescription = String(item.description || '').trim().length > 0;
+    return hasAmount && !hasDescription;
+  });
+}
+
 export default function App() {
   const [invoice, setInvoice] = useState(loadInitialInvoice);
   const [savedDocuments, setSavedDocuments] = useState(loadSavedDocuments);
@@ -300,6 +310,13 @@ export default function App() {
   }
 
   async function handleDownload() {
+    if (hasPricedItemWithoutDescription(invoice.items)) {
+      const message = 'Please add a description for every priced line item before downloading the PDF.';
+      flash(message);
+      alert(message);
+      return;
+    }
+
     setIsDownloading(true);
     try {
       await downloadElementAsPDF('invoice-preview', buildDocumentFilename(invoice));
