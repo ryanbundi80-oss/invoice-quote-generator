@@ -70,6 +70,44 @@
   box-shadow: 0 0 0 3px var(--ink);
 }
 
+.saved-tools {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.saved-search {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.75rem 0.95rem;
+  outline: none;
+  font-weight: 700;
+}
+
+.filter-pills {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-pills button {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.filter-pills button.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
 .saved-list {
   display: grid;
   gap: 0.7rem;
@@ -147,6 +185,28 @@
   right: 0;
 }
 
+.preview-panel {
+  min-width: 0;
+}
+
+.preview-sticky {
+  position: sticky;
+  top: 88px;
+  align-self: start;
+  max-height: calc(100vh - 104px);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.preview-sticky::-webkit-scrollbar {
+  width: 8px;
+}
+
+.preview-sticky::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
 .brand-lockup {
   display: flex;
   align-items: flex-start;
@@ -190,6 +250,13 @@
     display: block;
   }
 
+  .preview-sticky {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+  }
+
   .invoice-sheet {
     box-shadow: none;
     border-radius: 0;
@@ -199,14 +266,103 @@
   }
 }
 
+@media (max-width: 1050px) {
+  .preview-sticky {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 @media (max-width: 700px) {
   .quick-actions,
   .quick-actions .btn {
     width: 100%;
   }
 
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .topbar-actions .btn-primary {
+    grid-column: 1 / -1;
+  }
+
   .brand-lockup {
     flex-direction: column;
+  }
+
+  .line-items {
+    overflow: visible;
+  }
+
+  .items-grid {
+    min-width: 0;
+    grid-template-columns: 1fr 82px;
+  }
+
+  .items-head {
+    display: none;
+  }
+
+  .item-row {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 0.7rem;
+    background: #fff;
+  }
+
+  .item-row input:first-child,
+  .amount-cell {
+    grid-column: 1 / -1;
+  }
+
+  .amount-cell {
+    justify-content: space-between;
+  }
+
+  .amount-cell::before {
+    content: 'Amount';
+    font-family: 'DM Sans', sans-serif;
+    color: var(--faint);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+  }
+
+  .preview-panel {
+    padding: 0.8rem;
+  }
+
+  .invoice-sheet {
+    padding: 1.2rem;
+    border-radius: 14px;
+  }
+
+  .preview-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    font-size: 0.82rem;
+  }
+
+  .preview-total-wrap {
+    justify-content: stretch;
+  }
+
+  .preview-totals {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .preview-totals div,
+  .totals-box div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.2rem;
   }
 
   .saved-item {
