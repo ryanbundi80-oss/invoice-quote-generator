@@ -1,6 +1,8 @@
-import { Download, FilePlus2, MessageSquareText } from 'lucide-react';
+import { Download, FilePlus2, MessageSquareText, Printer, Send } from 'lucide-react';
 
-export default function Header({ onDownload, onNewDocument, onCopyMessage, isDownloading }) {
+export default function Header({ documentType = 'invoice', onDownload, onNewDocument, onCopyMessage, onWhatsAppShare, onPrint, isDownloading }) {
+  const label = documentType === 'quote' ? 'quote' : documentType === 'receipt' ? 'receipt' : 'invoice';
+
   return (
     <header className="topbar">
       <div className="brand-mark" aria-label="InvoiceKit home">
@@ -9,13 +11,21 @@ export default function Header({ onDownload, onNewDocument, onCopyMessage, isDow
       </div>
 
       <div className="topbar-actions">
-        <button className="btn btn-secondary" type="button" onClick={onNewDocument}>
+        <button className="btn btn-secondary" type="button" onClick={onNewDocument} title="Starts a blank document using your current business details">
           <FilePlus2 size={16} />
-          New
+          New {label}
         </button>
         <button className="btn btn-secondary" type="button" onClick={onCopyMessage}>
           <MessageSquareText size={16} />
-          Copy client message
+          Copy message
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={onWhatsAppShare}>
+          <Send size={16} />
+          WhatsApp
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={onPrint}>
+          <Printer size={16} />
+          Print
         </button>
         <button className="btn btn-primary" type="button" onClick={onDownload} disabled={isDownloading}>
           <Download size={16} />
