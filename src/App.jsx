@@ -11,28 +11,35 @@ import './polish.css';
 const STORAGE_KEY = 'invoicekit-current-draft';
 const HISTORY_KEY = 'invoicekit-saved-documents';
 
+const TYPE_META = {
+  invoice: { prefix: 'INV', label: 'invoice', status: 'unpaid', subtitle: 'Tax Invoice' },
+  quote: { prefix: 'QUO', label: 'quote', status: 'draft', subtitle: 'Freelance Quote' },
+  receipt: { prefix: 'RCT', label: 'receipt', status: 'paid', subtitle: 'Payment Receipt' }
+};
+
 function newLineItem() {
   return { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 };
 }
 
 function createEmptyInvoice(overrides = {}) {
   const type = overrides.type || 'invoice';
-  const prefix = type === 'quote' ? 'QUO' : 'INV';
+  const meta = TYPE_META[type] || TYPE_META.invoice;
 
   return {
     id: crypto.randomUUID(),
     type,
-    status: 'unpaid',
-    number: `${prefix}-001`,
+    status: meta.status,
+    number: `${meta.prefix}-001`,
     currency: 'KES',
     issueDate: getTodayInputValue(),
     dueDate: getFutureInputValue(14),
     taxRate: 16,
     withholdingRate: 0,
+    amountPaid: 0,
     branding: {
       logo: '',
       accentColor: '#0f6b4a',
-      documentSubtitle: 'Professional business document'
+      documentSubtitle: meta.subtitle
     },
     from: {
       name: '',
@@ -66,6 +73,7 @@ function migrateInvoice(rawInvoice) {
   return {
     ...fresh,
     ...rawInvoice,
+    amountPaid: rawInvoice?.amountPaid ?? fresh.amountPaid,
     branding: { ...fresh.branding, ...(rawInvoice?.branding || {}) },
     from: { ...fresh.from, ...(rawInvoice?.from || {}) },
     to: { ...fresh.to, ...(rawInvoice?.to || {}) },
@@ -113,28 +121,46 @@ function setNestedValue(object, path, value) {
 function upsertDocument(documents, document) {
   const stamped = touch(document);
   const withoutCurrent = documents.filter((item) => item.id !== stamped.id);
-  return [stamped, ...withoutCurrent].slice(0, 12);
+  return [stamped, ...withoutCurrent].slice(0, 25);
 }
 
 function nextDocumentNumber(type, documents) {
-  const prefix = type === 'quote' ? 'QUO' : 'INV';
-  const matcher = new RegExp(`^${prefix}-(\\d+)$`, 'i');
+  const meta = TYPE_META[type] || TYPE_META.invoice;
+  const matcher = new RegExp(`^${meta.prefix}-(\\d+)$`, 'i');
   const highest = documents.reduce((max, document) => {
     const match = String(document.number || '').match(matcher);
     return match ? Math.max(max, Number(match[1])) : max;
   }, 0);
 
-  return `${prefix}-${String(highest + 1).padStart(3, '0')}`;
+  return `${meta.prefix}-${String(highest + 1).padStart(3, '0')}`;
+}
+
+function updateDocumentType(document, nextType, documents) {
+  const meta = TYPE_META[nextType] || TYPE_META.invoice;
+  return touch({
+    ...document,
+    type: nextType,
+    status: nextType === 'receipt' ? 'paid' : document.status,
+    number: nextDocumentNumber(nextType, documents),
+    branding: {
+      ...document.branding,
+      documentSubtitle: meta.subtitle
+    },
+    amountPaid: nextType === 'receipt' ? 0 : document.amountPaid
+  });
 }
 
 function buildShareMessage(invoice, totals) {
-  const title = invoice.type === 'quote' ? 'quote' : 'invoice';
+  const meta = TYPE_META[invoice.type] || TYPE_META.invoice;
   const clientName = invoice.to.name || 'there';
-  const dueLabel = invoice.type === 'quote' ? 'valid until' : 'due on';
-  const dueDate = invoice.dueDate ? formatDate(invoice.dueDate) : 'the agreed date';
-  const payment = invoice.paymentDetails ? `\n\nPayment details:\n${invoice.paymentDetails}` : '';
+  const dueLabel = invoice.type === 'quote' ? 'Valid until' : invoice.type === 'receipt' ? 'Paid on' : 'Due by';
+  const dueDate = invoice.type === 'receipt' ? formatDate(invoice.issueDate) : formatDate(invoice.dueDate);
+  const payment = invoice.paymentDetails ? `\nPay via:\n${invoice.paymentDetails}` : '';
+  const amountLine = invoice.type === 'receipt'
+    ? `for ${formatMoney(totals.total, invoice.currency)}.`
+    : `for ${formatMoney(totals.balanceDue || totals.total, invoice.currency)}. ${dueLabel} ${dueDate}.`;
 
-  return `Hi ${clientName}, here is ${title.toUpperCase()} ${invoice.number || ''} for ${formatMoney(totals.total, invoice.currency)}, ${dueLabel} ${dueDate}.${payment}\n\nKind regards,\n${invoice.from.name || 'Your business'}`;
+  return `Hi ${clientName}, please find your ${meta.label.toUpperCase()} ${invoice.number || ''} ${amountLine}${payment}\n\nThank you,\n${invoice.from.name || 'Your business'}`;
 }
 
 export default function App() {
@@ -144,8 +170,8 @@ export default function App() {
   const [savedMessage, setSavedMessage] = useState('');
 
   const totals = useMemo(
-    () => calculateTotals(invoice.items, invoice.taxRate, invoice.withholdingRate),
-    [invoice.items, invoice.taxRate, invoice.withholdingRate]
+    () => calculateTotals(invoice.items, invoice.taxRate, invoice.withholdingRate, invoice.amountPaid),
+    [invoice.items, invoice.taxRate, invoice.withholdingRate, invoice.amountPaid]
   );
 
   const readiness = useMemo(() => {
@@ -156,7 +182,7 @@ export default function App() {
       { label: 'Client details added', done: Boolean(invoice.to.name) },
       { label: 'At least one priced item', done: billableItems.length > 0 },
       { label: 'Payment details added', done: Boolean(invoice.paymentDetails) },
-      { label: 'Due date set', done: Boolean(invoice.dueDate) }
+      { label: invoice.type === 'quote' ? 'Expiry date set' : invoice.type === 'receipt' ? 'Payment date set' : 'Due date set', done: Boolean(invoice.dueDate || invoice.type === 'receipt') }
     ];
   }, [invoice]);
 
@@ -174,6 +200,11 @@ export default function App() {
   }
 
   function updateInvoice(path, value) {
+    if (path === 'type') {
+      setInvoice((current) => updateDocumentType(current, value, savedDocuments));
+      return;
+    }
+
     setInvoice((current) => setNestedValue(current, path, value));
   }
 
@@ -207,18 +238,20 @@ export default function App() {
   }
 
   function startNewDocument(type = invoice.type) {
+    const meta = TYPE_META[type] || TYPE_META.invoice;
     const next = createEmptyInvoice({
       type,
+      status: meta.status,
       number: nextDocumentNumber(type, savedDocuments),
       currency: invoice.currency,
-      branding: invoice.branding,
+      branding: { ...invoice.branding, documentSubtitle: meta.subtitle },
       from: invoice.from,
       paymentDetails: invoice.paymentDetails,
-      notes: invoice.notes
+      notes: type === 'receipt' ? 'Thank you. Payment received.' : invoice.notes
     });
 
     setInvoice(next);
-    flash(`Started ${type === 'quote' ? 'a new quote' : 'a new invoice'}.`);
+    flash(`Started ${type === 'quote' ? 'a new quote' : type === 'receipt' ? 'a new receipt' : 'a new invoice'}. Fill in the form on the left.`);
   }
 
   function loadDocument(documentId) {
@@ -235,7 +268,7 @@ export default function App() {
     const duplicate = migrateInvoice({
       ...document,
       id: crypto.randomUUID(),
-      status: 'draft',
+      status: document.type === 'receipt' ? 'paid' : 'draft',
       number: nextDocumentNumber(document.type, savedDocuments),
       issueDate: getTodayInputValue(),
       dueDate: getFutureInputValue(14),
@@ -276,6 +309,15 @@ export default function App() {
     }
   }
 
+  function shareToWhatsApp() {
+    const message = encodeURIComponent(buildShareMessage(invoice, totals));
+    window.open(`https://wa.me/?text=${message}`, '_blank', 'noopener,noreferrer');
+  }
+
+  function printDocument() {
+    window.print();
+  }
+
   async function handleDownload() {
     setIsDownloading(true);
     try {
@@ -292,9 +334,12 @@ export default function App() {
   return (
     <>
       <Header
+        documentType={invoice.type}
         onDownload={handleDownload}
         onNewDocument={() => startNewDocument(invoice.type)}
         onCopyMessage={copyPaymentMessage}
+        onWhatsAppShare={shareToWhatsApp}
+        onPrint={printDocument}
         isDownloading={isDownloading}
       />
       {savedMessage && <div className="toast">{savedMessage}</div>}
