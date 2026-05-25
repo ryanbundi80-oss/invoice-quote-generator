@@ -227,7 +227,7 @@
 }
 
 .preview-totals .grand {
-  background: color-mix(in srgb, var(--document-accent) 12%, white);
+  background: var(--accent-soft);
 }
 
 .preview-totals .grand strong {
