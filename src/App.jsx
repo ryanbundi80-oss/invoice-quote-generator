@@ -41,20 +41,8 @@ function createEmptyInvoice(overrides = {}) {
       accentColor: '#0f6b4a',
       documentSubtitle: meta.subtitle
     },
-    from: {
-      name: '',
-      email: '',
-      phone: '',
-      taxPin: '',
-      address: ''
-    },
-    to: {
-      name: '',
-      email: '',
-      phone: '',
-      taxPin: '',
-      address: ''
-    },
+    from: { name: '', email: '', phone: '', taxPin: '', address: '' },
+    to: { name: '', email: '', phone: '', taxPin: '', address: '' },
     items: [newLineItem()],
     paymentDetails: '',
     notes: 'Payment due within 14 days. Thank you for your business.',
@@ -108,12 +96,10 @@ function setNestedValue(object, path, value) {
   const keys = path.split('.');
   const clone = structuredClone(object);
   let current = clone;
-
   keys.slice(0, -1).forEach((key) => {
     current[key] = current[key] ?? {};
     current = current[key];
   });
-
   current[keys.at(-1)] = value;
   return touch(clone);
 }
@@ -131,7 +117,6 @@ function nextDocumentNumber(type, documents) {
     const match = String(document.number || '').match(matcher);
     return match ? Math.max(max, Number(match[1])) : max;
   }, 0);
-
   return `${meta.prefix}-${String(highest + 1).padStart(3, '0')}`;
 }
 
@@ -142,10 +127,7 @@ function updateDocumentType(document, nextType, documents) {
     type: nextType,
     status: nextType === 'receipt' ? 'paid' : document.status,
     number: nextDocumentNumber(nextType, documents),
-    branding: {
-      ...document.branding,
-      documentSubtitle: meta.subtitle
-    },
+    branding: { ...document.branding, documentSubtitle: meta.subtitle },
     amountPaid: nextType === 'receipt' ? 0 : document.amountPaid
   });
 }
@@ -159,7 +141,6 @@ function buildShareMessage(invoice, totals) {
   const amountLine = invoice.type === 'receipt'
     ? `for ${formatMoney(totals.total, invoice.currency)}.`
     : `for ${formatMoney(totals.balanceDue || totals.total, invoice.currency)}. ${dueLabel} ${dueDate}.`;
-
   return `Hi ${clientName}, please find your ${meta.label.toUpperCase()} ${invoice.number || ''} ${amountLine}${payment}\n\nThank you,\n${invoice.from.name || 'Your business'}`;
 }
 
@@ -176,7 +157,6 @@ export default function App() {
 
   const readiness = useMemo(() => {
     const billableItems = invoice.items.filter((item) => item.description && Number(item.unitPrice) > 0);
-
     return [
       { label: 'Business details added', done: Boolean(invoice.from.name && invoice.from.email) },
       { label: 'Client details added', done: Boolean(invoice.to.name) },
@@ -194,6 +174,13 @@ export default function App() {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(savedDocuments));
   }, [savedDocuments]);
 
+  useEffect(() => {
+    document.querySelectorAll('input, select, textarea').forEach((field, index) => {
+      if (!field.id) field.id = `invoicekit-field-${index}`;
+      if (!field.name) field.name = field.id;
+    });
+  });
+
   function flash(message) {
     setSavedMessage(message);
     window.setTimeout(() => setSavedMessage(''), 2500);
@@ -204,7 +191,6 @@ export default function App() {
       setInvoice((current) => updateDocumentType(current, value, savedDocuments));
       return;
     }
-
     setInvoice((current) => setNestedValue(current, path, value));
   }
 
@@ -217,10 +203,7 @@ export default function App() {
   }
 
   function addItem() {
-    setInvoice((current) => touch({
-      ...current,
-      items: [...current.items, newLineItem()]
-    }));
+    setInvoice((current) => touch({ ...current, items: [...current.items, newLineItem()] }));
   }
 
   function removeItem(index) {
@@ -249,7 +232,6 @@ export default function App() {
       paymentDetails: invoice.paymentDetails,
       notes: type === 'receipt' ? 'Thank you. Payment received.' : invoice.notes
     });
-
     setInvoice(next);
     flash(`Started ${type === 'quote' ? 'a new quote' : type === 'receipt' ? 'a new receipt' : 'a new invoice'}. Fill in the form on the left.`);
   }
@@ -264,7 +246,6 @@ export default function App() {
   function duplicateDocument(documentId) {
     const document = savedDocuments.find((item) => item.id === documentId);
     if (!document) return;
-
     const duplicate = migrateInvoice({
       ...document,
       id: crypto.randomUUID(),
@@ -276,13 +257,17 @@ export default function App() {
       updatedAt: new Date().toISOString(),
       items: document.items.map((item) => ({ ...item, id: crypto.randomUUID() }))
     });
-
     setInvoice(duplicate);
     setSavedDocuments((current) => upsertDocument(current, duplicate));
     flash('Duplicated document for faster reuse.');
   }
 
   function deleteDocument(documentId) {
+    const document = savedDocuments.find((item) => item.id === documentId);
+    const label = document?.number || 'this document';
+    const shouldDelete = window.confirm(`Delete ${label}? This cannot be undone.`);
+    if (!shouldDelete) return;
+
     setSavedDocuments((current) => current.filter((item) => item.id !== documentId));
     if (invoice.id === documentId) startNewDocument(invoice.type);
     flash('Removed saved document.');
@@ -292,11 +277,7 @@ export default function App() {
     setSavedDocuments((current) => current.map((item) => (
       item.id === documentId ? touch({ ...item, status: 'paid' }) : item
     )));
-
-    if (invoice.id === documentId) {
-      setInvoice((current) => touch({ ...current, status: 'paid' }));
-    }
-
+    if (invoice.id === documentId) setInvoice((current) => touch({ ...current, status: 'paid' }));
     flash('Marked as paid.');
   }
 
@@ -333,33 +314,10 @@ export default function App() {
 
   return (
     <>
-      <Header
-        documentType={invoice.type}
-        onDownload={handleDownload}
-        onNewDocument={() => startNewDocument(invoice.type)}
-        onCopyMessage={copyPaymentMessage}
-        onWhatsAppShare={shareToWhatsApp}
-        onPrint={printDocument}
-        isDownloading={isDownloading}
-      />
+      <Header documentType={invoice.type} onDownload={handleDownload} onNewDocument={() => startNewDocument(invoice.type)} onCopyMessage={copyPaymentMessage} onWhatsAppShare={shareToWhatsApp} onPrint={printDocument} isDownloading={isDownloading} />
       {savedMessage && <div className="toast">{savedMessage}</div>}
       <main className="app-shell">
-        <InvoiceForm
-          invoice={invoice}
-          totals={totals}
-          readiness={readiness}
-          savedDocuments={savedDocuments}
-          onChange={updateInvoice}
-          onChangeItem={updateItem}
-          onAddItem={addItem}
-          onRemoveItem={removeItem}
-          onSaveDraft={saveDraft}
-          onNewDocument={startNewDocument}
-          onLoadDocument={loadDocument}
-          onDuplicateDocument={duplicateDocument}
-          onDeleteDocument={deleteDocument}
-          onMarkDocumentPaid={markDocumentPaid}
-        />
+        <InvoiceForm invoice={invoice} totals={totals} readiness={readiness} savedDocuments={savedDocuments} onChange={updateInvoice} onChangeItem={updateItem} onAddItem={addItem} onRemoveItem={removeItem} onSaveDraft={saveDraft} onNewDocument={startNewDocument} onLoadDocument={loadDocument} onDuplicateDocument={duplicateDocument} onDeleteDocument={deleteDocument} onMarkDocumentPaid={markDocumentPaid} />
         <InvoicePreview invoice={invoice} totals={totals} />
       </main>
     </>
