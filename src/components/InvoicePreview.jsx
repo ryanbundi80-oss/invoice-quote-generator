@@ -16,6 +16,14 @@ function getDocumentTitle(type) {
   return 'Invoice';
 }
 
+function getSafeDescription(item) {
+  const description = String(item.description || '').trim();
+  const amount = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+  if (description) return description;
+  if (amount > 0) return 'Service provided';
+  return '—';
+}
+
 export default function InvoicePreview({ invoice, totals }) {
   const title = getDocumentTitle(invoice.type);
   const isReceipt = invoice.type === 'receipt';
@@ -89,7 +97,7 @@ export default function InvoicePreview({ invoice, totals }) {
                   const amount = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
                   return (
                     <tr key={item.id}>
-                      <td>{item.description || '—'}</td>
+                      <td>{getSafeDescription(item)}</td>
                       <td>{Number(item.quantity) || 0}</td>
                       <td>{formatMoney(item.unitPrice, invoice.currency)}</td>
                       <td>{formatMoney(amount, invoice.currency)}</td>
@@ -125,6 +133,11 @@ export default function InvoicePreview({ invoice, totals }) {
               )}
             </footer>
           )}
+
+          <div className="invoice-kit-footer">
+            <span>Thank you for your business.</span>
+            <span>Generated with InvoiceKit</span>
+          </div>
         </article>
       </div>
     </section>
