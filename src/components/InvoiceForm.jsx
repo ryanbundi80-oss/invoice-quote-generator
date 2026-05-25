@@ -97,6 +97,10 @@ export default function InvoiceForm({ invoice, totals, readiness = [], savedDocu
         </div>
       </div>
 
+      <div className="privacy-notice" role="note">
+        <strong>Privacy note:</strong> Your drafts and saved invoices are stored only in this browser for now. Avoid using shared computers for sensitive client, KRA PIN, or payment information.
+      </div>
+
       <div className="section-card readiness-card">
         <div className="section-title">Readiness checklist</div>
         <div className="readiness-grid">
