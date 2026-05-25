@@ -12,16 +12,21 @@ function DetailBlock({ title, name, lines }) {
 
 export default function InvoicePreview({ invoice, totals }) {
   const title = invoice.type === 'quote' ? 'Quote' : 'Invoice';
+  const accentStyle = { '--document-accent': invoice.branding?.accentColor || '#0f6b4a' };
 
   return (
     <section className="preview-panel" aria-label="Invoice preview">
       <p className="eyebrow preview-heading">Live preview</p>
 
-      <article className="invoice-sheet" id="invoice-preview">
+      <article className="invoice-sheet" id="invoice-preview" style={accentStyle}>
+        <div className="invoice-top-accent" />
         <div className="invoice-top">
-          <div>
-            <p className="sheet-brand">{invoice.from.name || 'Your Business'}</p>
-            <p className="sheet-subtitle">Clean business document</p>
+          <div className="brand-lockup">
+            {invoice.branding?.logo && <img className="invoice-logo" src={invoice.branding.logo} alt={`${invoice.from.name || 'Business'} logo`} />}
+            <div>
+              <p className="sheet-brand">{invoice.from.name || 'Your Business'}</p>
+              <p className="sheet-subtitle">{invoice.branding?.documentSubtitle || 'Professional business document'}</p>
+            </div>
           </div>
           <div className="sheet-meta">
             <h2>{title}</h2>
@@ -39,7 +44,7 @@ export default function InvoicePreview({ invoice, totals }) {
           <DetailBlock
             title="Bill to"
             name={invoice.to.name}
-            lines={[invoice.to.email, invoice.to.address]}
+            lines={[invoice.to.email, invoice.to.phone, invoice.to.taxPin && `KRA PIN: ${invoice.to.taxPin}`, invoice.to.address]}
           />
         </div>
 
@@ -51,6 +56,10 @@ export default function InvoicePreview({ invoice, totals }) {
           <div>
             <span>{invoice.type === 'quote' ? 'Valid until' : 'Due date'}</span>
             <strong>{formatDate(invoice.dueDate)}</strong>
+          </div>
+          <div>
+            <span>Currency</span>
+            <strong>{invoice.currency}</strong>
           </div>
         </div>
 
@@ -85,7 +94,7 @@ export default function InvoicePreview({ invoice, totals }) {
             <div><span>Subtotal</span><strong>{formatMoney(totals.subtotal, invoice.currency)}</strong></div>
             <div><span>VAT / tax ({invoice.taxRate || 0}%)</span><strong>{formatMoney(totals.tax, invoice.currency)}</strong></div>
             <div><span>WHT ({invoice.withholdingRate || 0}%)</span><strong>- {formatMoney(totals.withholding, invoice.currency)}</strong></div>
-            <div className="grand"><span>Total due</span><strong>{formatMoney(totals.total, invoice.currency)}</strong></div>
+            <div className="grand"><span>{invoice.type === 'quote' ? 'Quote total' : 'Total due'}</span><strong>{formatMoney(totals.total, invoice.currency)}</strong></div>
           </div>
         </div>
 
