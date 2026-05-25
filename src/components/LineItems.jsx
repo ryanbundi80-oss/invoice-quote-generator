@@ -21,12 +21,15 @@ export default function LineItems({ items, currency, onChangeItem, onAddItem, on
               value={item.description}
               onChange={(event) => onChangeItem(index, 'description', event.target.value)}
               placeholder="Website design, logo package, consulting..."
+              maxLength={240}
+              autoComplete="off"
             />
             <input
               value={item.quantity}
               onChange={(event) => onChangeItem(index, 'quantity', event.target.value)}
               type="number"
               min="0"
+              max="100000"
               step="1"
             />
             <input
@@ -34,6 +37,7 @@ export default function LineItems({ items, currency, onChangeItem, onAddItem, on
               onChange={(event) => onChangeItem(index, 'unitPrice', event.target.value)}
               type="number"
               min="0"
+              max="999999999"
               step="0.01"
             />
             <div className="amount-cell">{formatMoney(amount, currency)}</div>
