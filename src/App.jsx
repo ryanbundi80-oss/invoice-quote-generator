@@ -222,11 +222,35 @@ function hasPricedItemWithoutDescription(items) {
   });
 }
 
+function MobileViewToggle({ activeView, readiness, onChange }) {
+  const readyCount = readiness.filter((item) => item.done).length;
+
+  return (
+    <div className="mobile-view-toggle" aria-label="Mobile document view switcher">
+      <button
+        className={activeView === 'form' ? 'active' : ''}
+        type="button"
+        onClick={() => onChange('form')}
+      >
+        Edit form
+      </button>
+      <button
+        className={activeView === 'preview' ? 'active' : ''}
+        type="button"
+        onClick={() => onChange('preview')}
+      >
+        Preview · {readyCount}/{readiness.length}
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [invoice, setInvoice] = useState(loadInitialInvoice);
   const [savedDocuments, setSavedDocuments] = useState(loadSavedDocuments);
   const [isDownloading, setIsDownloading] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
+  const [mobileView, setMobileView] = useState('form');
 
   const totals = useMemo(
     () => calculateTotals(invoice.items, invoice.taxRate, invoice.withholdingRate, invoice.amountPaid),
@@ -311,6 +335,7 @@ export default function App() {
       notes: type === 'receipt' ? 'Thank you. Payment received.' : invoice.notes
     });
     setInvoice(next);
+    setMobileView('form');
     flash(`Started ${type === 'quote' ? 'a new quote' : type === 'receipt' ? 'a new receipt' : 'a new invoice'}. Fill in the form on the left.`);
   }
 
@@ -318,6 +343,7 @@ export default function App() {
     const document = savedDocuments.find((item) => item.id === documentId);
     if (!document) return;
     setInvoice(migrateInvoice(document));
+    setMobileView('form');
     flash('Loaded saved document.');
   }
 
@@ -336,6 +362,7 @@ export default function App() {
       items: document.items.map((item) => ({ ...item, id: crypto.randomUUID() }))
     });
     setInvoice(duplicate);
+    setMobileView('form');
     setSavedDocuments((current) => upsertDocument(current, duplicate));
     flash('Duplicated document for faster reuse.');
   }
@@ -401,7 +428,8 @@ export default function App() {
     <>
       <Header documentType={invoice.type} onDownload={handleDownload} onNewDocument={() => startNewDocument(invoice.type)} onCopyMessage={copyPaymentMessage} onWhatsAppShare={shareToWhatsApp} onPrint={printDocument} isDownloading={isDownloading} />
       {savedMessage && <div className="toast">{savedMessage}</div>}
-      <main className="app-shell">
+      <MobileViewToggle activeView={mobileView} readiness={readiness} onChange={setMobileView} />
+      <main className={`app-shell mobile-view-${mobileView}`}>
         <InvoiceForm invoice={invoice} totals={totals} readiness={readiness} savedDocuments={savedDocuments} onChange={updateInvoice} onChangeItem={updateItem} onAddItem={addItem} onRemoveItem={removeItem} onSaveDraft={saveDraft} onNewDocument={startNewDocument} onLoadDocument={loadDocument} onDuplicateDocument={duplicateDocument} onDeleteDocument={deleteDocument} onMarkDocumentPaid={markDocumentPaid} />
         <InvoicePreview invoice={invoice} totals={totals} />
       </main>
